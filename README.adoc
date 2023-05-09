@@ -1,0 +1,82 @@
+:imagesdir: images/
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+:imagesdir: images/
+endif::[]
+
+:sectnums!:
+
+= Exercise MinMaxCollector
+
+The java Stream class provides multiple reduce operations, such as `findFirst()`, `findAny()`, `sum()`, `min()`, `max()`, and `average()` (for number values).
+In case you want to have the extreme values of a collection, and try to do that with a streaming operation,
+you need both *min* and *max*. 
+
+Streaming the collection twice would be a sub-optimal solution,
+because when streaming the collection once, both the minimum and maximum value have been seen,
+and it would be smarter to catch both in one go.
+
+You can solve this problem using the reduce method
+`<U> U	reduce​(U identity, BiFunction<U,​? super T,​U> accumulator, BinaryOperator<U> combiner)`, but that
+requires you to come up with three parts, identity, accumulator and combiner every time you need min and max.
+From the programmers perspective, streaming *twice* will then become attractive, because it is minimal programming. Or the programmer
+might fall back to old-skool for-loops (or even use `forEach(...)`), which will do the trick but is not the way to use streams. +
+And simple for-loops can't be parallelized.
+
+In this exercise you will be implementing the `Collector<T,A,R>` interface, such that the resulting class can add functionality to already existing classes.
+Special with this interface is that is returns *functions*, implemented as lambda expressions that do the required work, which
+are then used to to build the required *Collector* object.
+
+.Simple API, that can be used in the following way:
+[source,java]
+----
+   List<Student> students=...;
+
+   Optional<MinMax<Student>> extremesByAge =
+       student.stream()
+               .collect( minmax ( comparing(Student::getDob ) ) ); // <1>
+----
+
+<1> The resulting Optional will contain a MinMax with two students, the min and max aged student. Explain why the youngest is at position max.
+
+You will implement your own reducer, which actually is also a kind of collector, because it will produce a `MinMax` Pair.
+The class is called *MinMaxCollector*, which has an static inner class *MinMax*.
+
+To be able to determine min and max, you must construct the MinMaxCollector with a `Comparator<T>`
+
+The design is already done, it is part of the stream API and is captured in the
+https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/stream/Collector.html[Collector] interface, which prescribes the following
+methods: (from the API doc).
+
+* `Supplier<A>	supplier()`	 A function that creates and returns a new mutable result container. +
+  Create a https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/function/Supplier.html[supplier] that returns a new `MinMax` instance.
+* `BiConsumer<A,​T>	accumulator()`	A function that folds a value into a mutable result container. +
+  Create a https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/function/BiConsumer.html[BiConsumer] where `A` will be our MinMax and `T` the next element, the `MinMax` should accept the next element.
+* `BinaryOperator<A>  combiner()`. A https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/function/BinaryOperator.html[BinaryOperator] takes two elements of the same type and combines
+  them into a third element of the same time. The same as '+' combines two ints into a third int. In our case it will combine two MinMax objects into one.
+  You can use one of the two to `accept()` the minimum and maximum of the other, so that the first will then contain min and max of both.
+* `Function<A,​R>	finisher()`	Perform the final transformation from the intermediate accumulation type `A` to the final result type `R`. +
+  Return a https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/function/Function.html[Function] that transforms the `MinMax` into an `Optional<MinMax>`, make sure to return an empty Optional when there are no values in the stream.
+* `Set<Collector.Characteristics>	characteristics()`	Returns a Set of Collector.Characteristics indicating the characteristics of this Collector. +
+  Simply return `Set.of( UNORDERED, CONCURRENT )`, meaning that your
+  solution doesn't preserve the order of elements and that it can be used concurrently.
+
+.Complete class diagram
+image::minmaxcollector.svg[title="class diagram"]
+
+The class diagram shows all members of the two classes involved, the MinMaxCollector and the inner MinMax class.
+
+== TODO
+
+All tests are already given.
+
+. Start by implementing the `accept` method on `MinMax`
+** Make sure to handle `null` values
+** If the `next` value is less than the current `min` or greater than the current `max`, the values should be updated
+. Implement `MinMaxCollector`
+** Add neccesary fields
+** Implement methods from top to bottom, see above for explanation
